@@ -1120,7 +1120,15 @@ if (S.gps) { nameFromCoords(); save(); }
 applyTexts();
 drawSun($("sunBig"), "big"); drawSun($("icRise"), "rise"); drawSun($("icTransit"), "transit"); drawSun($("icSet"), "set");
 render();
-try { const pg = +localStorage.getItem("effemeridi.page"); if (pg > 0) requestAnimationFrame(() => { pager.scrollLeft = pg * pager.clientWidth; }); } catch (e) {}
+// #tempo, #luna, #sole aprono direttamente quella schermata; altrimenti si riapre l'ultima vista
+const HASH_PAGES = { tempo: 0, luna: 1, sole: 2, time: 0, moon: 1, sun: 2 };
+function pageFromHash() { const h = location.hash.slice(1).toLowerCase(); return h in HASH_PAGES ? HASH_PAGES[h] : null; }
+{
+  let pg = pageFromHash();
+  if (pg === null) { try { pg = +localStorage.getItem("effemeridi.page") || 0; } catch (e) { pg = 0; } }
+  if (pg > 0) requestAnimationFrame(() => { pager.scrollLeft = pg * pager.clientWidth; });
+}
+addEventListener("hashchange", () => { const pg = pageFromHash(); if (pg !== null) pager.scrollTo({ left: pg * pager.clientWidth, behavior: "smooth" }); });
 addEventListener("resize", () => { fitTitle($("placeName")); fitTitle($("moonName")); });
 setInterval(() => { if (S.realtime || render.first !== true) { render(); render.first = true; } }, 1000);
 </script>
