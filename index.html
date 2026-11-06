@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Effemeridi astronomiche: tempo siderale, Luna e Sole calcolati in tempo reale per il tuo luogo.">
+<meta name="apple-mobile-web-app-title" content="Effemeridi">
+<meta name="theme-color" content="#070507">
+<title>Effemeridi</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<style>
+/* Layout: una "scheda" color prugna a tutta altezza, tre pagine scorrevoli in orizzontale (Tempo · Luna · Sole), barra con ? · puntini · ingranaggio. Pannello impostazioni chiaro in stile iOS. */
+:root{
+  --night:#070507;
+  --plum:#36263b;
+  --plum-deep:#251a29;
+  --plum-edge:#4d3a52;
+  --ink:#f5eff3;
+  --muted:#c4b3c2;
+  --faint:rgba(255,255,255,.075);
+  --gold:#f1b94a;
+  --signal:#6ee06a;
+  --sheet:#f2f2f7;
+  --cell:#ffffff;
+  --sheet-ink:#111114;
+  --sheet-muted:#86868c;
+  --sheet-line:#d8d8dd;
+  --ios-blue:#3168d6;
+  --display:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  --body:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}
+body{margin:0}
+body{background:var(--night);color:var(--ink);font-family:var(--body);-webkit-font-smoothing:antialiased;overflow:hidden;
+  padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px));box-sizing:border-box}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+.app{height:100%;max-width:460px;margin:0 auto;padding-block:16px 8px;display:flex}
+.card{position:relative;flex:1;display:flex;flex-direction:column;min-width:0;border-radius:24px;overflow:hidden;
+  background:
+    linear-gradient(180deg,#c9c3cb 0,#a39ba6 14px,#857c88 30px,#6a606d 44px,#54485a 49px,rgba(0,0,0,0) 50px),
+    repeating-linear-gradient(90deg,rgba(0,0,0,.13) 0 1px,rgba(255,255,255,.03) 1px 2px,rgba(0,0,0,0) 2px 3px),
+    linear-gradient(180deg,#3b2c40 0%,#33263a 45%,#2b2030 100%);
+  border:3px solid #7d7580;box-shadow:0 0 0 1px #000,inset 0 0 0 1px rgba(0,0,0,.55),inset 0 2px 0 rgba(255,255,255,.35)}
+.signal{position:absolute;top:2px;right:8px;width:40px;height:46px;z-index:3}
+.signal .on{display:inline}.signal.off .on{display:none}
+
+.pager{flex:1;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;position:relative;z-index:1}
+.pager::-webkit-scrollbar{display:none}
+.page{flex:0 0 100%;min-width:0;scroll-snap-align:start;overflow-y:auto;padding:8px 18px 4px 22px;display:flex;flex-direction:column;gap:16px;scrollbar-width:none}
+.page::-webkit-scrollbar{display:none}
+
+.head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;min-height:128px}
+.head > div{padding-right:6px;min-width:0}
+.title{overflow:hidden;margin-right:34px !important;font-family:var(--display);font-weight:400;font-size:clamp(32px,11vw,46px);letter-spacing:-.5px;line-height:1.2;padding-bottom:2px;margin:6px 0 4px;white-space:nowrap;text-shadow:0 2px 3px rgba(0,0,0,.55)}
+#p-sun .title{margin-top:16px}
+#sDist{font-size:15px;letter-spacing:-.2px}
+.kv{display:grid;grid-template-columns:auto 1fr;column-gap:8px;row-gap:3px;font-size:15.5px}
+.kv dt{color:var(--ink);white-space:nowrap} .kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.cal{width:118px;border-radius:22px;position:relative;margin-top:14px;box-shadow:0 8px 16px rgba(0,0,0,.55)}
+.cal .top{border-radius:22px 22px 0 0;background:linear-gradient(#e0574a,#b7311f 70%,#9d2316);color:#fff;font-size:14px;white-space:nowrap;padding:14px 8px 7px 11px;display:flex;justify-content:space-between;align-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.cal .top span:last-child{flex:0 0 auto;width:24px;height:15px;background:radial-gradient(circle,#fff 1.1px,transparent 1.5px) 0 0/4px 4px;opacity:.85}
+.cal .day{border-radius:0 0 22px 22px;background:linear-gradient(#fdfdfd,#ececec 55%,#cfcfcf);color:#2f2f2f;font:700 82px/1 "Helvetica Neue",Helvetica,Arial,sans-serif;letter-spacing:-3px;text-align:center;padding:6px 0 10px;text-shadow:0 1px 0 #fff}
+.cal::before,.cal::after{content:"";position:absolute;top:-12px;width:8px;height:26px;border-radius:4px;background:linear-gradient(90deg,#8d8d8d,#fafafa 45%,#a5a5a5);box-shadow:0 2px 2px rgba(0,0,0,.4)}
+.cal::before{left:24px}.cal::after{right:24px}
+
+.rows{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);column-gap:10px;row-gap:5px;font-size:18px;align-items:baseline}
+.rows dt{color:var(--ink);white-space:nowrap}
+.rows dd{margin:0;font-variant-numeric:tabular-nums;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#p-sun .rows{grid-template-columns:minmax(0,1fr) minmax(0,1.04fr);font-size:16px}
+#p-moon .rows{font-size:17px;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}
+#p-moon .pair{font-size:14px}
+.rows .gap{grid-column:1/-1;height:8px}
+.rows dd small{color:var(--muted);font-size:14px}
+.pair{display:grid;grid-template-columns:auto 1fr;column-gap:6px;font-size:15.5px;row-gap:2px}
+.pair span:nth-child(even){text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.strip{margin-top:auto;display:grid;margin-inline:-22px -18px;border-top:1px solid rgba(255,255,255,.06);box-shadow:0 -1px 0 rgba(0,0,0,.35)}
+.strip.three{grid-template-columns:repeat(3,1fr)}
+.strip.four{grid-template-columns:repeat(4,1fr)}
+.strip > div{display:flex;flex-direction:column;align-items:center;gap:0;padding:6px 2px 2px;text-align:center;font-variant-numeric:tabular-nums;font-size:17px;min-width:0;white-space:nowrap}
+.strip.three > div{font-size:19px}
+.strip > div + div{border-left:1px solid rgba(255,255,255,.05);box-shadow:-1px 0 0 rgba(0,0,0,.3)}
+.strip .lbl{font-size:19px;margin-bottom:2px}
+.strip canvas{width:56px;height:56px;margin-bottom:6px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.6))}
+.strip.three canvas{width:74px;height:74px;margin-bottom:2px;filter:none}
+
+.moonbig{width:110px;height:110px;margin-top:4px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.75))}
+.sunbig{width:122px;height:122px;margin-top:2px}
+
+.bar{position:relative;z-index:2;display:grid;grid-template-columns:48px 1fr 48px;align-items:center;padding:2px 12px 6px}
+.bar button{width:44px;height:44px;display:grid;place-items:center;font:700 34px/1 "Helvetica Neue",Helvetica,Arial,sans-serif;color:#fff;text-shadow:0 2px 2px rgba(0,0,0,.5)}
+.dots{display:flex;justify-content:center;gap:12px}
+.dots button{width:11px;height:11px;border-radius:50%;background:rgba(255,255,255,.3);padding:0}
+.dots button[aria-current="true"]{background:#fff}
+.gear svg{width:34px;height:34px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))}
+
+/* ---------- Pannello impostazioni (chiaro, stile iOS) ---------- */
+.sheet{position:fixed;inset:0;z-index:20;background:var(--sheet);color:var(--sheet-ink);display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+.sheet header{display:grid;grid-template-columns:80px 1fr 80px;align-items:center;min-height:54px;background:#f9f9fb;border-bottom:1px solid var(--sheet-line);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sheet header h2{margin:0;text-align:center;font-size:18px;font-weight:600}
+.sheet header button{color:var(--ios-blue);font-size:18px;text-align:left;text-decoration:underline;text-underline-offset:3px}
+.sheet main{flex:1;overflow-y:auto;padding:8px 0 24px}
+.sec{margin:22px 0 6px;padding-left:max(16px,env(safe-area-inset-left,0px));font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--sheet-muted)}
+.group{background:var(--cell);border-block:1px solid var(--sheet-line)}
+.cell{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:50px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));font-size:17px}
+.cell + .cell{border-top:1px solid var(--sheet-line);margin-left:16px;padding-left:0}
+.cell label{font-weight:600;flex:0 0 auto}
+.cell .v{color:var(--sheet-muted);text-align:right;min-width:0;display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.cell select,.cell input{font:inherit;color:var(--sheet-muted);background:transparent;border:0;text-align:right;text-align-last:right;min-width:0;max-width:62vw;appearance:none;-webkit-appearance:none;padding:6px 0}
+.cell input[type=number]{width:9.5em}
+.cell input:disabled{opacity:.55}
+.cell .chev{color:#c4c4c8;font-size:20px}
+.note{padding:8px max(16px,env(safe-area-inset-left,0px));font-size:13px;color:var(--sheet-muted);line-height:1.4}
+.btn{display:block;width:100%;text-align:left;color:var(--ios-blue);font-weight:500}
+.check{color:var(--ios-blue);font-weight:700}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:#f6f6f8;border-top:1px solid var(--sheet-line);padding:4px 4px 2px}
+.tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0 4px;color:#8e8e93;font-size:12px;border-radius:10px}
+.tabs button[aria-selected="true"]{color:var(--ios-blue);background:#dde7fb}
+.tabs svg{width:30px;height:30px}
+.about{background:#000;color:#cfcfcf;min-height:100%;padding:36px max(20px,env(safe-area-inset-left,0px)) 30px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;line-height:1.5}
+.about canvas{width:170px;height:170px}
+.about p{margin:0;max-width:34em}
+.about .ver{color:#9a9a9a;font-size:14px}
+
+/* ---------- Guida ---------- */
+.help{position:fixed;inset:0;z-index:20;background:#fff;color:#1b1b1f;display:flex;flex-direction:column;color-scheme:light;padding-top:env(safe-area-inset-top,0px)}
+.help header{min-height:54px;display:flex;align-items:center;border-bottom:1px solid var(--sheet-line);padding-left:max(16px,env(safe-area-inset-left,0px))}
+.help header button{color:var(--ios-blue);font-size:18px;text-decoration:underline;text-underline-offset:3px}
+.help article{overflow-y:auto;padding:16px max(18px,env(safe-area-inset-left,0px)) 40px max(18px,env(safe-area-inset-right,0px));line-height:1.5;font-size:15px}
+.help h3{font-family:var(--display);font-weight:500;font-size:22px;margin:22px 0 6px}
+.help dt{font-weight:700;margin-top:10px}
+.help dd{margin:2px 0 0}
+.help p{max-width:40em}
+@media (prefers-reduced-motion:reduce){.pager{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="card">
+    <div class="signal" id="signal" title=""><svg viewBox="0 0 40 46" width="40" height="46" aria-hidden="true">
+      <defs><radialGradient id="bulbOn" cx=".35" cy=".35" r=".7"><stop offset="0" stop-color="#eaffe6"/><stop offset=".45" stop-color="#6ee06a"/><stop offset="1" stop-color="#1c7419"/></radialGradient>
+      <radialGradient id="bulbOff" cx=".35" cy=".35" r=".7"><stop offset="0" stop-color="#f2f2f2"/><stop offset=".5" stop-color="#9a919c"/><stop offset="1" stop-color="#4a404c"/></radialGradient>
+      <linearGradient id="pole" x1="0" x2="1"><stop offset="0" stop-color="#8a8a8a"/><stop offset=".45" stop-color="#f4f4f4"/><stop offset="1" stop-color="#7a7a7a"/></linearGradient></defs>
+      <g class="on" fill="none" stroke="#52d84e" stroke-width="1.6" stroke-linecap="round" opacity=".9"><path d="M13.5 6.5a7 7 0 0 0 0 9"/><path d="M10 4a11 11 0 0 0 0 14"/><path d="M26.5 6.5a7 7 0 0 1 0 9"/><path d="M30 4a11 11 0 0 1 0 14"/></g>
+      <rect x="18.6" y="15" width="2.8" height="24" rx="1.2" fill="url(#pole)"/>
+      <ellipse cx="20" cy="40" rx="7" ry="2.2" fill="url(#pole)"/>
+      <circle cx="20" cy="11" r="5.2" fill="url(#bulbOff)"/><circle class="on" cx="20" cy="11" r="5.2" fill="url(#bulbOn)"/>
+    </svg></div>
+    <div class="pager" id="pager">
+      <!-- Pagina 1: Tempo -->
+      <section class="page" id="p-time" aria-label="Tempo">
+        <div class="head">
+          <div class="cal" aria-hidden="true"><div class="top"><span id="calMonth">nov 2026</span><span></span></div><div class="day" id="calDay">6</div></div>
+          <div style="min-width:0">
+            <h1 class="title" id="placeName">Bologna</h1>
+            <dl class="kv">
+              <dt data-t="lat"></dt><dd id="vLat"></dd>
+              <dt data-t="lon"></dt><dd id="vLon"></dd>
+              <dt data-t="alt"></dt><dd id="vAlt"></dd>
+            </dl>
+          </div>
+        </div>
+        <dl class="rows">
+          <dt data-t="date"></dt><dd id="vDate"></dd>
+          <dt data-t="time"></dt><dd id="vTime"></dd>
+          <div class="gap"></div>
+          <dt data-t="tz"></dt><dd id="vTz"></dd>
+          <dt data-t="sid"></dt><dd id="vSid"></dd>
+          <dt data-t="gsid"></dt><dd id="vGsid"></dd>
+          <dt data-t="jd"></dt><dd id="vJd"></dd>
+          <div class="gap"></div>
+          <dt data-t="dateUtc"></dt><dd id="vDateU"></dd>
+          <dt data-t="timeUtc"></dt><dd id="vTimeU"></dd>
+          <dt>Delta-T:</dt><dd id="vDT"></dd>
+        </dl>
+        <div class="strip three">
+          <div><span class="lbl" data-t="rise"></span><canvas id="icRise" width="200" height="200"></canvas><span id="vRise"></span></div>
+          <div><span class="lbl" data-t="transit"></span><canvas id="icTransit" width="200" height="200"></canvas><span id="vTransit"></span></div>
+          <div><span class="lbl" data-t="set"></span><canvas id="icSet" width="200" height="200"></canvas><span id="vSet"></span></div>
+        </div>
+      </section>
+
+      <!-- Pagina 2: Luna -->
+      <section class="page" id="p-moon" aria-label="Luna">
+        <div class="head">
+          <canvas class="moonbig" id="moonBig" width="360" height="360"></canvas>
+          <div style="min-width:0">
+            <h1 class="title" id="moonName"></h1>
+            <dl class="kv">
+              <dt data-t="ra"></dt><dd id="mRa"></dd>
+              <dt data-t="dec"></dt><dd id="mDec"></dd>
+              <dt data-t="lunation"></dt><dd id="mLun"></dd>
+            </dl>
+          </div>
+        </div>
+        <dl class="rows">
+          <dt data-t="mrise"></dt><dd id="mRise"></dd>
+          <dt data-t="mset"></dt><dd id="mSet"></dd>
+          <div class="gap"></div>
+          <dt data-t="hour"></dt><dd id="mHA"></dd>
+          <dt data-t="altaz"></dt><dd><div class="pair"><span data-t="altitude"></span><span id="mAlt"></span><span data-t="azimuth"></span><span id="mAz"></span></div></dd>
+          <div class="gap"></div>
+          <dt data-t="age"></dt><dd id="mAge"></dd>
+          <dt data-t="phase"></dt><dd id="mPhase"></dd>
+          <dt data-t="visible"></dt><dd id="mVis"></dd>
+          <dt data-t="dist"></dt><dd id="mDist"></dd>
+          <div class="gap"></div>
+          <dt data-t="ecl"></dt><dd><div class="pair"><span data-t="elat"></span><span id="mEb"></span><span data-t="elon"></span><span id="mEl"></span></div></dd>
+        </dl>
+        <div class="strip four" id="phaseStrip"></div>
+      </section>
+
+      <!-- Pagina 3: Sole -->
+      <section class="page" id="p-sun" aria-label="Sole">
+        <div class="head">
+          <canvas class="sunbig" id="sunBig" width="360" height="360"></canvas>
+          <div style="min-width:0">
+            <h1 class="title" data-t="sun"></h1>
+            <dl class="kv">
+              <dt data-t="ra"></dt><dd id="sRa"></dd>
+              <dt data-t="dec"></dt><dd id="sDec"></dd>
+            </dl>
+          </div>
+        </div>
+        <dl class="rows">
+          <dt data-t="daylen"></dt><dd id="sLen"></dd>
+          <div class="gap"></div>
+          <dt data-t="dawn"></dt><dd id="sDawn"></dd>
+          <dt data-t="srise"></dt><dd id="sRise"></dd>
+          <dt data-t="maxalt"></dt><dd id="sMax"></dd>
+          <dt data-t="sset"></dt><dd id="sSet"></dd>
+          <dt data-t="dusk"></dt><dd id="sDusk"></dd>
+          <div class="gap"></div>
+          <dt data-t="dist"></dt><dd id="sDist"></dd>
+          <dt data-t="diam"></dt><dd id="sDiam"></dd>
+          <dt data-t="slon"></dt><dd id="sLon"></dd>
+          <div class="gap"></div>
+          <dt data-t="eot"></dt><dd id="sEot"></dd>
+          <dt data-t="obl"></dt><dd id="sObl"></dd>
+          <div class="gap"></div>
+          <dt data-t="nut"></dt><dd><div class="pair"><span>(Δψ)</span><span id="sDpsi"></span><span>(Δε)</span><span id="sDeps"></span></div></dd>
+        </dl>
+      </section>
+    </div>
+    <div class="bar">
+      <button id="btnHelp" aria-label="Guida">?</button>
+      <div class="dots" id="dots"><button aria-label="Tempo" aria-current="true"></button><button aria-label="Luna"></button><button aria-label="Sole"></button></div>
+      <button class="gear" id="btnGear" aria-label="Impostazioni"><svg viewBox="0 0 24 24" fill="#fff"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<!-- Impostazioni -->
+<div class="sheet" id="sheet" hidden>
+  <header><button id="sheetDone" data-t="done"></button><h2 id="sheetTitle"></h2><span></span></header>
+  <main id="sheetBody"></main>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="settings" aria-selected="true"><svg viewBox="0 0 32 32" fill="currentColor"><rect x="6" y="4" width="4" height="12" rx="1"/><rect x="5" y="17" width="6" height="11" rx="2"/><path d="M19 4h3v6h2V4h3v7l-3 3v12a2 2 0 0 1-4 0V14l-3-3V4z"/></svg><span data-t="tabSettings"></span></button>
+    <button role="tab" data-tab="location"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3"><circle cx="16" cy="16" r="12"/><ellipse cx="16" cy="16" rx="5.5" ry="12"/><path d="M4 16h24M6 9.5h20M6 22.5h20"/></svg><span data-t="tabLocation"></span></button>
+    <button role="tab" data-tab="language"><svg viewBox="0 0 32 32" fill="currentColor"><path d="M5 5h13v10H11l-4 3v-3H5z"/><path d="M20 12h7v10h-2v3l-4-3h-6v-5h5z" opacity=".7"/></svg><span data-t="tabLanguage"></span></button>
+    <button role="tab" data-tab="about"><svg viewBox="0 0 32 32" fill="currentColor"><path d="M7 20l14-14 3 3-14 14z"/><path d="M14 20l-5 9h2.5l4-7 4 7H22l-5-9z"/><circle cx="25" cy="4" r="1"/><circle cx="28" cy="8" r="1"/><circle cx="21" cy="2.5" r=".8"/></svg><span data-t="tabAbout"></span></button>
+  </nav>
+</div>
+
+<!-- Guida -->
+<div class="help" id="help" hidden>
+  <header><button id="helpDone" data-t="done"></button></header>
+  <article id="helpBody"></article>
+</div>
+
+<script>
+/* =====================================================================
+   ASTRONOMIA — algoritmi da J. Meeus, "Astronomical Algorithms" (2ª ed.)
+   ===================================================================== */
+const Astro = (() => {
+  const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+  const n360 = x => ((x % 360) + 360) % 360;
+  const sin = d => Math.sin(d * D2R), cos = d => Math.cos(d * D2R);
+  const SYN = 29.530588853;
+
+  const jdFromMs = ms => ms / 86400000 + 2440587.5;
+  const msFromJd = jd => (jd - 2440587.5) * 86400000;
+
+  // Delta-T (secondi) — polinomi di Espenak & Meeus
+  function deltaT(jd) {
+    const y = 2000 + (jd - 2451544.5) / 365.25;
+    let t;
+    if (y >= 2005 && y < 2050) { t = y - 2000; return 62.92 + 0.32217 * t + 0.005589 * t * t; }
+    if (y >= 2050 && y < 2150) return -20 + 32 * ((y - 1820) / 100) ** 2 - 0.5628 * (2150 - y);
+    if (y >= 1986 && y < 2005) { t = y - 2000; return 63.86 + 0.3345 * t - 0.060374 * t * t + 0.0017275 * t ** 3 + 0.000651814 * t ** 4 + 0.00002373599 * t ** 5; }
+    if (y >= 1961 && y < 1986) { t = y - 1975; return 45.45 + 1.067 * t - t * t / 260 - t ** 3 / 718; }
+    if (y >= 1941 && y < 1961) { t = y - 1950; return 29.07 + 0.407 * t - t * t / 233 + t ** 3 / 2547; }
+    if (y >= 1920 && y < 1941) { t = y - 1920; return 21.20 + 0.84493 * t - 0.076100 * t * t + 0.0020936 * t ** 3; }
+    if (y >= 1900 && y < 1920) { t = y - 1900; return -2.79 + 1.494119 * t - 0.0598939 * t * t + 0.0061966 * t ** 3 - 0.000197 * t ** 4; }
+    const u = (y - 1820) / 100; return -20 + 32 * u * u;
+  }
+
+  // Nutazione e obliquità (Meeus cap. 22, precisione 0.5")
+  function nutation(T) {
+    const Om = 125.04452 - 1934.136261 * T, L = 280.4665 + 36000.7698 * T, Lp = 218.3165 + 481267.8813 * T;
+    const dpsi = -17.20 * sin(Om) - 1.32 * sin(2 * L) - 0.23 * sin(2 * Lp) + 0.21 * sin(2 * Om);
+    const deps = 9.20 * cos(Om) + 0.57 * cos(2 * L) + 0.10 * cos(2 * Lp) - 0.09 * cos(2 * Om);
+    const eps0 = 23.43929111 - (46.8150 * T + 0.00059 * T * T - 0.001813 * T ** 3) / 3600;
+    return { dpsi, deps, eps0, eps: eps0 + deps / 3600 };
+  }
+
+  // Tempo siderale apparente di Greenwich (gradi), jd in UT
+  function gast(jd, nut) {
+    const T = (jd - 2451545) / 36525;
+    const g = 280.46061837 + 360.98564736629 * (jd - 2451545) + 0.000387933 * T * T - T ** 3 / 38710000;
+    return n360(g + (nut.dpsi * cos(nut.eps)) / 3600);
+  }
+
+  function eclToEq(lam, beta, eps) {
+    const ra = n360(Math.atan2(sin(lam) * cos(eps) - Math.tan(beta * D2R) * sin(eps), cos(lam)) * R2D);
+    const dec = Math.asin(sin(beta) * cos(eps) + cos(beta) * sin(eps) * sin(lam)) * R2D;
+    return { ra, dec };
+  }
+
+  // Sole (Meeus cap. 25, precisione ~0.01°)
+  function sun(jd) {
+    const dT = deltaT(jd), T = (jd + dT / 86400 - 2451545) / 36525;
+    const L0 = n360(280.46646 + 36000.76983 * T + 0.0003032 * T * T);
+    const M = n360(357.52911 + 35999.05029 * T - 0.0001537 * T * T);
+    const e = 0.016708634 - 0.000042037 * T - 0.0000001267 * T * T;
+    const C = (1.914602 - 0.004817 * T - 0.000014 * T * T) * sin(M) + (0.019993 - 0.000101 * T) * sin(2 * M) + 0.000289 * sin(3 * M);
+    const trueLon = L0 + C, v = M + C;
+    const R = 1.000001018 * (1 - e * e) / (1 + e * cos(v));
+    const nut = nutation(T);
+    const lam = n360(trueLon - 0.00569 + nut.dpsi / 3600);
+    const { ra, dec } = eclToEq(lam, 0, nut.eps);
+    // Equazione del tempo (Meeus 28.3)
+    const y = Math.tan(nut.eps / 2 * D2R) ** 2, L0r = L0 * D2R, Mr = M * D2R;
+    const E = y * Math.sin(2 * L0r) - 2 * e * Math.sin(Mr) + 4 * e * y * Math.sin(Mr) * Math.cos(2 * L0r)
+      - 0.5 * y * y * Math.sin(4 * L0r) - 1.25 * e * e * Math.sin(2 * Mr);
+    return { ra, dec, lam, R, km: R * 149597870.7, diam: 2 * 959.63 / R / 3600, eot: E * R2D * 4, nut, dT };
+  }
+
+  // Luna (Meeus cap. 47, termini principali)
+  const LR = [
+    [0,0,1,0,6288774,-20905355],[2,0,-1,0,1274027,-3699111],[2,0,0,0,658314,-2955968],[0,0,2,0,213618,-569925],
+    [0,1,0,0,-185116,48888],[0,0,0,2,-114332,-3149],[2,0,-2,0,58793,246158],[2,-1,-1,0,57066,-152138],
+    [2,0,1,0,53322,-170733],[2,-1,0,0,45758,-204586],[0,1,-1,0,-40923,-129620],[1,0,0,0,-34720,108743],
+    [0,1,1,0,-30383,104755],[2,0,0,-2,15327,10321],[0,0,1,2,-12528,0],[0,0,1,-2,10980,79661],
+    [4,0,-1,0,10675,-34782],[0,0,3,0,10034,-23210],[4,0,-2,0,8548,-21636],[2,1,-1,0,-7888,24208],
+    [2,1,0,0,-6766,30824],[1,0,-1,0,-5163,-8379],[1,1,0,0,4987,-16675],[2,-1,1,0,4036,-12831],
+    [2,0,2,0,3994,-10445],[4,0,0,0,3861,-11650],[2,0,-3,0,3665,14403],[0,1,-2,0,-2689,-7003],
+    [2,0,-1,2,-2602,0],[2,-1,-2,0,2390,10056],[1,0,1,0,-2348,6322],[2,-2,0,0,2236,-9884],
+    [0,1,2,0,-2120,5751],[0,2,0,0,-2069,0],[2,-2,-1,0,2048,-4950],[2,0,1,-2,-1773,4130],
+    [2,0,0,2,-1595,0],[4,-1,-1,0,1215,-3958],[0,0,2,2,-1110,0],[3,0,-1,0,-892,3258],
+    [2,1,1,0,-810,2616],[4,-1,-2,0,759,-1897],[0,2,-1,0,-713,-2117],[2,2,-1,0,-700,2354],
+    [2,1,-2,0,691,0],[2,-1,0,-2,596,0],[4,0,1,0,549,-1423],[0,0,4,0,537,-1117],
+    [4,-1,0,0,520,-1571],[1,0,-2,0,-487,-1739],[2,1,0,-2,-399,0],[0,0,2,-2,-381,-4421],
+    [1,1,1,0,351,0],[3,0,-2,0,-340,0],[4,0,-3,0,330,0],[2,-1,2,0,327,0],
+    [0,2,1,0,-323,1165],[1,1,-1,0,299,0],[2,0,3,0,294,0],[2,0,-1,-2,0,8752]
+  ];
+  const BT = [
+    [0,0,0,1,5128122],[0,0,1,1,280602],[0,0,1,-1,277693],[2,0,0,-1,173237],[2,0,-1,1,55413],
+    [2,0,-1,-1,46271],[2,0,0,1,32573],[0,0,2,1,17198],[2,0,1,-1,9266],[0,0,2,-1,8822],
+    [2,-1,0,-1,8216],[2,0,-2,-1,4324],[2,0,1,1,4200],[2,1,0,-1,-3359],[2,-1,-1,1,2463],
+    [2,-1,0,1,2211],[2,-1,-1,-1,2065],[0,1,-1,-1,-1870],[4,0,-1,-1,1828],[0,1,0,1,-1794],
+    [0,0,0,3,-1749],[0,1,-1,1,-1565],[1,0,0,1,-1491],[0,1,1,1,-1475],[0,1,1,-1,-1410],
+    [0,1,0,-1,-1344],[1,0,0,-1,-1335],[0,0,3,1,1107],[4,0,0,-1,1021],[4,0,-1,1,833]
+  ];
+  function moon(jd) {
+    const dT = deltaT(jd), T = (jd + dT / 86400 - 2451545) / 36525;
+    const Lp = n360(218.3164477 + 481267.88123421 * T - 0.0015786 * T * T + T ** 3 / 538841 - T ** 4 / 65194000);
+    const D = n360(297.8501921 + 445267.1114034 * T - 0.0018819 * T * T + T ** 3 / 545868 - T ** 4 / 113065000);
+    const M = n360(357.5291092 + 35999.0502909 * T - 0.0001536 * T * T + T ** 3 / 24490000);
+    const Mp = n360(134.9633964 + 477198.8675055 * T + 0.0087414 * T * T + T ** 3 / 69699 - T ** 4 / 14712000);
+    const F = n360(93.2720950 + 483202.0175233 * T - 0.0036539 * T * T - T ** 3 / 3526000 + T ** 4 / 863310000);
+    const A1 = n360(119.75 + 131.849 * T), A2 = n360(53.09 + 479264.290 * T), A3 = n360(313.45 + 481266.484 * T);
+    const E = 1 - 0.002516 * T - 0.0000074 * T * T;
+    let sl = 0, sr = 0, sb = 0;
+    for (const [d, m, mp, f, l, r] of LR) {
+      const a = d * D + m * M + mp * Mp + f * F, k = m === 0 ? 1 : (Math.abs(m) === 1 ? E : E * E);
+      sl += k * l * sin(a); sr += k * r * cos(a);
+    }
+    for (const [d, m, mp, f, b] of BT) {
+      const k = m === 0 ? 1 : (Math.abs(m) === 1 ? E : E * E);
+      sb += k * b * sin(d * D + m * M + mp * Mp + f * F);
+    }
+    sl += 3958 * sin(A1) + 1962 * sin(Lp - F) + 318 * sin(A2);
+    sb += -2235 * sin(Lp) + 382 * sin(A3) + 175 * sin(A1 - F) + 175 * sin(A1 + F) + 127 * sin(Lp - Mp) - 115 * sin(Lp + Mp);
+    const nut = nutation(T);
+    const lam = n360(Lp + sl / 1e6 + nut.dpsi / 3600), beta = sb / 1e6, km = 385000.56 + sr / 1000;
+    const { ra, dec } = eclToEq(lam, beta, nut.eps);
+    return { ra, dec, lam, beta, km, par: Math.asin(6378.14 / km) * R2D, nut };
+  }
+
+  // Coordinate topocentriche (Meeus cap. 40): la Luna vista dal luogo dell'osservatore
+  function topocentric(p, jd, lat, lon, altM) {
+    const u = Math.atan(0.99664719 * Math.tan(lat * D2R)), hh = altM / 6378140;
+    const rs = 0.99664719 * Math.sin(u) + hh * sin(lat), rc = Math.cos(u) + hh * cos(lat);
+    const th = n360(gast(jd, p.nut) + lon), Re = 6378.14;
+    const x = p.km * cos(p.dec) * cos(p.ra) - Re * rc * cos(th);
+    const y = p.km * cos(p.dec) * sin(p.ra) - Re * rc * sin(th);
+    const z = p.km * sin(p.dec) - Re * rs;
+    const km = Math.hypot(x, y, z), ra = n360(Math.atan2(y, x) * R2D), dec = Math.asin(z / km) * R2D, e = p.nut.eps;
+    const lam = n360(Math.atan2(sin(ra) * cos(e) + Math.tan(dec * D2R) * sin(e), cos(ra)) * R2D);
+    const beta = Math.asin(sin(dec) * cos(e) - cos(dec) * sin(e) * sin(ra)) * R2D;
+    return { ...p, ra, dec, km, lam, beta };
+  }
+
+  function horizontal(p, jd, lat, lon) {
+    const lst = n360(gast(jd, p.nut) + lon);
+    let H = n360(lst - p.ra);
+    const h = Math.asin(sin(lat) * sin(p.dec) + cos(lat) * cos(p.dec) * cos(H)) * R2D;
+    const az = n360(Math.atan2(sin(H), cos(H) * sin(lat) - Math.tan(p.dec * D2R) * cos(lat)) * R2D + 180);
+    return { alt: h, az, H, lst };
+  }
+
+  // Levata / transito / tramonto: campionamento ogni 10 min + bisezione
+  function events(body, dayStartMs, lat, lon, h0fn) {
+    const pos = body === 'sun' ? sun : moon;
+    const at = ms => { const jd = jdFromMs(ms), p = pos(jd), hz = horizontal(p, jd, lat, lon);
+      let H = hz.H > 180 ? hz.H - 360 : hz.H; return { v: hz.alt - h0fn(p), H, az: hz.az, alt: hz.alt }; };
+    const N = 144, step = 86400000 / N, out = { rise: null, set: null, transit: null };
+    let a = at(dayStartMs), ta = dayStartMs;
+    for (let i = 1; i <= N; i++) {
+      const tb = dayStartMs + i * step, b = at(tb);
+      if ((a.v < 0) !== (b.v < 0)) {
+        const kind = a.v < 0 ? 'rise' : 'set';
+        let lo = ta, hi = tb, flo = a;
+        for (let j = 0; j < 22; j++) { const mid = (lo + hi) / 2, m = at(mid); if ((m.v < 0) === (flo.v < 0)) { lo = mid; flo = m; } else hi = mid; }
+        if (!out[kind]) { const fin = at(hi); out[kind] = { ms: hi, az: fin.az }; }
+      }
+      if (a.H < 0 && b.H >= 0 && b.H - a.H < 90 && !out.transit) {
+        let lo = ta, hi = tb;
+        for (let j = 0; j < 22; j++) { const mid = (lo + hi) / 2; if (at(mid).H < 0) lo = mid; else hi = mid; }
+        const fin = at(hi); out.transit = { ms: hi, alt: fin.alt };
+      }
+      a = b; ta = tb;
+    }
+    return out;
+  }
+
+  // Fasi lunari (Meeus cap. 49)
+  function phaseJD(k, type) {
+    const T = k / 1236.85;
+    let jde = 2451550.09766 + 29.530588861 * k + 0.00015437 * T * T - 0.000000150 * T ** 3 + 0.00000000073 * T ** 4;
+    const E = 1 - 0.002516 * T - 0.0000074 * T * T;
+    const M = 2.5534 + 29.10535670 * k - 0.0000014 * T * T - 0.00000011 * T ** 3;
+    const Mp = 201.5643 + 385.81693528 * k + 0.0107582 * T * T + 0.00001238 * T ** 3 - 0.000000058 * T ** 4;
+    const F = 160.7108 + 390.67050284 * k - 0.0016118 * T * T - 0.00000227 * T ** 3 + 0.000000011 * T ** 4;
+    const Om = 124.7746 - 1.56375588 * k + 0.0020672 * T * T + 0.00000215 * T ** 3;
+    let c;
+    if (type === 0 || type === 2) {
+      const n = type === 0;
+      c = (n ? -0.40720 : -0.40614) * sin(Mp) + (n ? 0.17241 : 0.17302) * E * sin(M) + (n ? 0.01608 : 0.01614) * sin(2 * Mp)
+        + (n ? 0.01039 : 0.01043) * sin(2 * F) + (n ? 0.00739 : 0.00734) * E * sin(Mp - M) - (n ? 0.00514 : 0.00515) * E * sin(Mp + M)
+        + (n ? 0.00208 : 0.00209) * E * E * sin(2 * M) - 0.00111 * sin(Mp - 2 * F) - 0.00057 * sin(Mp + 2 * F)
+        + 0.00056 * E * sin(2 * Mp + M) - 0.00042 * sin(3 * Mp) + 0.00042 * E * sin(M + 2 * F) + 0.00038 * E * sin(M - 2 * F)
+        - 0.00024 * E * sin(2 * Mp - M) - 0.00017 * sin(Om) - 0.00007 * sin(Mp + 2 * M) + 0.00004 * sin(2 * Mp - 2 * F)
+        + 0.00004 * sin(3 * M) + 0.00003 * sin(Mp + M - 2 * F) + 0.00003 * sin(2 * Mp + 2 * F) - 0.00003 * sin(Mp + M + 2 * F)
+        + 0.00003 * sin(Mp - M + 2 * F) - 0.00002 * sin(Mp - M - 2 * F) - 0.00002 * sin(3 * Mp + M) + 0.00002 * sin(4 * Mp);
+    } else {
+      c = -0.62801 * sin(Mp) + 0.17172 * E * sin(M) - 0.01183 * E * sin(Mp + M) + 0.00862 * sin(2 * Mp) + 0.00804 * sin(2 * F)
+        + 0.00454 * E * sin(Mp - M) + 0.00204 * E * E * sin(2 * M) - 0.00180 * sin(Mp - 2 * F) - 0.00070 * sin(Mp + 2 * F)
+        - 0.00040 * sin(3 * Mp) - 0.00034 * E * sin(2 * Mp - M) + 0.00032 * E * sin(M + 2 * F) + 0.00032 * E * sin(M - 2 * F)
+        - 0.00028 * E * E * sin(Mp + 2 * M) + 0.00027 * E * sin(2 * Mp + M) - 0.00017 * sin(Om) - 0.00005 * sin(Mp - M - 2 * F)
+        + 0.00004 * sin(2 * Mp + 2 * F) - 0.00004 * sin(Mp + M + 2 * F) + 0.00004 * sin(Mp - 2 * M) + 0.00003 * sin(Mp + M - 2 * F)
+        + 0.00003 * sin(3 * M) + 0.00002 * sin(2 * Mp - 2 * F) + 0.00002 * sin(Mp - M + 2 * F) - 0.00002 * sin(3 * Mp + M);
+      const W = 0.00306 - 0.00038 * E * cos(M) + 0.00026 * cos(Mp) - 0.00002 * cos(Mp - M) + 0.00002 * cos(Mp + M) + 0.00002 * cos(2 * F);
+      c += type === 1 ? W : -W;
+    }
+    const A = [[299.77,0.107408,0.000325],[251.88,0.016321,0.000165],[251.83,26.651886,0.000164],[349.42,36.412478,0.000126],
+      [84.66,18.206239,0.000110],[141.74,53.303771,0.000062],[207.14,2.453732,0.000060],[154.84,7.306860,0.000056],
+      [34.52,27.261239,0.000047],[207.19,0.121824,0.000042],[291.34,1.844379,0.000040],[161.72,24.198154,0.000037],
+      [239.56,25.513099,0.000035],[331.55,3.592518,0.000023]];
+    let add = 0;
+    A.forEach(([a0, a1, co], i) => { add += co * sin(a0 + a1 * k - (i === 0 ? 0.009173 * T * T : 0)); });
+    jde += c + add;
+    return jde - deltaT(jde) / 86400; // → UT
+  }
+  function phases(jd) {
+    const y = 2000 + (jd - 2451545) / 365.25;
+    const k0 = Math.floor((y - 2000) * 12.3685) - 2, list = [];
+    for (let n = k0; n < k0 + 6; n++) for (let t = 0; t < 4; t++) list.push({ k: n, type: t, jd: phaseJD(n + t / 4, t) });
+    list.sort((a, b) => a.jd - b.jd);
+    const lastNew = list.filter(p => p.type === 0 && p.jd <= jd).pop();
+    const next = list.filter(p => p.jd > jd).slice(0, 4);
+    return { lastNew, next, lunation: lastNew.k + 953 };
+  }
+
+  return { D2R, R2D, n360, SYN, jdFromMs, msFromJd, deltaT, sun, moon, topocentric, horizontal, events, phases, gast, nutation };
+})();
+
+/* =====================================================================
+   DATI: città e regole dell'ora legale
+   ===================================================================== */
+const CITIES = [
+  // [nome, paese, lat, lon, alt m, fuso std, regola DST]
+  ["Bologna","Italia",44.4949,11.3426,54,1,"EU"],["Roma","Italia",41.9028,12.4964,21,1,"EU"],["Milano","Italia",45.4642,9.19,120,1,"EU"],
+  ["Napoli","Italia",40.8518,14.2681,17,1,"EU"],["Torino","Italia",45.0703,7.6869,239,1,"EU"],["Firenze","Italia",43.7696,11.2558,50,1,"EU"],
+  ["Venezia","Italia",45.4408,12.3155,1,1,"EU"],["Genova","Italia",44.4056,8.9463,20,1,"EU"],["Palermo","Italia",38.1157,13.3615,14,1,"EU"],
+  ["Bari","Italia",41.1171,16.8719,5,1,"EU"],["Cagliari","Italia",39.2238,9.1217,4,1,"EU"],["Trieste","Italia",45.6495,13.7768,2,1,"EU"],
+  ["Rimini","Italia",44.0678,12.5695,6,1,"EU"],["Modena","Italia",44.6471,10.9252,34,1,"EU"],["Ravenna","Italia",44.4184,12.2035,4,1,"EU"],
+  ["Ferrara","Italia",44.8381,11.6198,9,1,"EU"],["Parma","Italia",44.8015,10.3279,55,1,"EU"],["Verona","Italia",45.4384,10.9916,59,1,"EU"],
+  ["Padova","Italia",45.4064,11.8768,12,1,"EU"],["Catania","Italia",37.5079,15.083,7,1,"EU"],["Perugia","Italia",43.1107,12.3908,493,1,"EU"],
+  ["Ancona","Italia",43.6158,13.5189,16,1,"EU"],["Pescara","Italia",42.4618,14.2161,4,1,"EU"],["Trento","Italia",46.0748,11.1217,194,1,"EU"],
+  ["Bolzano","Italia",46.4983,11.3548,262,1,"EU"],["Aosta","Italia",45.7372,7.3201,583,1,"EU"],["L'Aquila","Italia",42.3498,13.3995,714,1,"EU"],
+  ["Potenza","Italia",40.6404,15.8056,819,1,"EU"],["Catanzaro","Italia",38.9098,16.5877,320,1,"EU"],["Campobasso","Italia",41.5603,14.6627,701,1,"EU"],
+  ["Londra","Regno Unito",51.5074,-0.1278,11,0,"EU"],["Parigi","Francia",48.8566,2.3522,35,1,"EU"],["Berlino","Germania",52.52,13.405,34,1,"EU"],
+  ["Madrid","Spagna",40.4168,-3.7038,667,1,"EU"],["Tarifa","Spagna",36.0143,-5.6044,5,1,"EU"],["Lisbona","Portogallo",38.7223,-9.1393,2,0,"EU"],
+  ["Atene","Grecia",37.9838,23.7275,70,2,"EU"],["Vienna","Austria",48.2082,16.3738,151,1,"EU"],["Zurigo","Svizzera",47.3769,8.5417,408,1,"EU"],
+  ["Amsterdam","Paesi Bassi",52.3676,4.9041,0,1,"EU"],["Reykjavík","Islanda",64.1466,-21.9426,0,0,"NONE"],
+  ["New York","Stati Uniti",40.7128,-74.006,10,-5,"US"],["Los Angeles","Stati Uniti",34.0522,-118.2437,71,-8,"US"],
+  ["Tokyo","Giappone",35.6762,139.6503,40,9,"NONE"],["Pechino","Cina",39.9042,116.4074,44,8,"NONE"],["Nuova Delhi","India",28.6139,77.209,216,5.5,"NONE"],
+  ["Sydney","Australia",-33.8688,151.2093,58,10,"AU"],["Buenos Aires","Argentina",-34.6037,-58.3816,25,-3,"NONE"],
+  ["Rio de Janeiro","Brasile",-22.9068,-43.1729,5,-3,"NONE"],["Città del Capo","Sudafrica",-33.9249,18.4241,15,2,"NONE"]
+];
+const COUNTRIES = [...new Set(CITIES.map(c => c[1]))];
+
+function nthSunday(y, m, n) { // n>0: n-esima domenica; n=-1: ultima
+  if (n === -1) { const d = new Date(Date.UTC(y, m + 1, 0)); return Date.UTC(y, m, d.getUTCDate() - d.getUTCDay()); }
+  const first = new Date(Date.UTC(y, m, 1)).getUTCDay();
+  return Date.UTC(y, m, 1 + ((7 - first) % 7) + 7 * (n - 1));
+}
+function isDST(rule, utMs, tz) {
+  const y = new Date(utMs).getUTCFullYear(), H = 3600000;
+  if (rule === "EU") return utMs >= nthSunday(y, 2, -1) + H && utMs < nthSunday(y, 9, -1) + H;
+  if (rule === "US") return utMs >= nthSunday(y, 2, 2) + (2 - tz) * H && utMs < nthSunday(y, 10, 1) + (1 - tz) * H;
+  if (rule === "AU") return utMs < nthSunday(y, 3, 1) + (3 - tz - 1) * H || utMs >= nthSunday(y, 9, 1) + (2 - tz) * H;
+  return false;
+}
+
+/* =====================================================================
+   STATO E PREFERENZE
+   ===================================================================== */
+const DEFAULTS = { lang: "it", hemi: "N", units: "metric", clock: "12", realtime: true, date: "", time: "",
+  gps: false, place: "Bologna", country: "Italia", lat: 44.4949, lon: 11.3426, alt: 54, tz: 1, rule: "EU", dst: "auto" };
+let S = { ...DEFAULTS };
+try { const raw = localStorage.getItem("effemeridi.v1"); if (raw) S = { ...DEFAULTS, ...JSON.parse(raw) }; } catch (e) {}
+function save() { try { localStorage.setItem("effemeridi.v1", JSON.stringify(S)); } catch (e) {} }
+(function initManual() {
+  if (!S.date) { const d = new Date(); const p = n => String(n).padStart(2, "0");
+    S.date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; S.time = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
+})();
+
+function offsetAt(utMs) {
+  if (S.rule === "SYS") return -new Date(utMs).getTimezoneOffset() / 60;
+  if (S.dst === "on") return S.tz + 1;
+  if (S.dst === "off") return S.tz;
+  return S.tz + (isDST(S.rule, utMs, S.tz) ? 1 : 0);
+}
+function currentUT() {
+  if (S.realtime) return Date.now();
+  const [y, m, d] = S.date.split("-").map(Number), [hh, mm, ss = 0] = S.time.split(":").map(Number);
+  const loc = Date.UTC(y, m - 1, d, hh, mm, ss);
+  let ut = loc - S.tz * 3600000; ut = loc - offsetAt(ut) * 3600000; return ut;
+}
+
+/* =====================================================================
+   TESTI
+   ===================================================================== */
+const T = {
+  it: { lat:"Latitudine:", lon:"Longitudine:", alt:"Altitudine:", date:"Data:", time:"Ora:", tz:"Fuso orario:", sid:"Tempo siderale:", gsid:"TS Greenwich:",
+    jd:"Data giuliana:", dateUtc:"Data (UTC):", timeUtc:"Ora (UTC):", rise:"Levata", transit:"Transito", set:"Tramonto",
+    ra:"Asc. retta:", dec:"Declinazione:", lunation:"Lunazione:", mrise:"Levata:", mset:"Tramonto:", hour:"Angolo orario:",
+    altaz:"Altazimutali:", altitude:"Altezza:", azimuth:"Azimut:", age:"Età della luna:", phase:"Fase:", visible:"Faccia visibile:",
+    dist:"Distanza:", ecl:"Eclittiche:", elat:"Latitudine:", elon:"Longitudine:", sun:"Sole", daylen:"Durata del giorno:",
+    dawn:"Alba civile:", srise:"Il sole sorge:", maxalt:"Altezza massima:", sset:"Il sole tramonta:", dusk:"Crepuscolo:",
+    diam:"Diametro angolare:", slon:"Longitudine eclittica:", eot:"Equazione del tempo:", obl:"Obliquità eclittica:", nut:"Nutazione:",
+    done:"Fine", tabSettings:"Impostazioni", tabLocation:"Posizione", tabLanguage:"Lingua", tabAbout:"Info",
+    meters:"metri", feet:"piedi", deg:"gradi", days:"giorni", hours:"ore", min:"min", sec:"sec",
+    none:"—", noRise:"nessuna levata oggi", noSet:"nessun tramonto oggi", polarDay:"sempre sopra l'orizzonte", polarNight:"sempre sotto l'orizzonte",
+    phases:["Luna Nuova","Luna Crescente","Primo Quarto","Gibbosa Crescente","Luna Piena","Gibbosa Calante","Ultimo Quarto","Luna Calante"],
+    sSettings:"Impostazioni", hemi:"Emisfero", north:"nord", south:"sud", units:"Unità di misura", clock:"Formato ora", metric:"Metrico", imperial:"Imperiale",
+    sDateTime:"Data e ora", realtime:"Tempo reale", yes:"sì", no:"no", fDate:"Data", fTime:"Ora",
+    sMode:"Modalità", gps:"GPS", useGps:"Usa la mia posizione", sCoords:"Coordinate", country:"Paese", city:"Città", custom:"Personalizzata",
+    fLat:"Latitudine (°)", fLon:"Longitudine (°)", fAlt:"Altitudine", fTz:"Fuso (ore da GMT)", fDst:"Ora legale", auto:"automatica",
+    gpsWait:"Richiesta della posizione…", gpsFail:"Posizione non disponibile qui. Scegli una città o inserisci le coordinate a mano.",
+    gpsPlace:"Posizione GPS", latHint:"Gradi decimali: nord positivo, est positivo (es. Bologna 44,4949 / 11,3426).",
+    sLang:"Lingua", realtimeHint:"Con Tempo reale su «no», tutti i calcoli usano data e ora scelte qui sotto.",
+    aboutText:"Effemeridi calcola, per il luogo e il momento scelti, le grandezze che un astrofilo usa ogni sera: tempo siderale, data giuliana, posizione e fasi della Luna, percorso del Sole.",
+    aboutText2:"Ricostruita come omaggio a un'app per iPhone usata per anni (iEphemeris Pro di Marco Piccone, 2008–2018). I calcoli seguono gli algoritmi di Jean Meeus, «Astronomical Algorithms».",
+    precision:"Precisione: circa 1 minuto per levate e tramonti, pochi secondi d'arco per le posizioni.",
+    help: `<h3>Schermata Tempo</h3><dl>
+<dt>Coordinate</dt><dd>Latitudine, longitudine e altitudine del luogo usato in tutti i calcoli.</dd>
+<dt>Data e ora</dt><dd>Con «Tempo reale» attivo seguono l'orologio del telefono; altrimenti restano fisse sul momento scelto nelle impostazioni.</dd>
+<dt>Fuso orario</dt><dd>Lo scarto dall'ora di Greenwich usato per passare da UTC all'ora locale, ora legale compresa.</dd>
+<dt>Tempo siderale</dt><dd>L'ora misurata sulle stelle. Quando è uguale all'ascensione retta di un oggetto, quell'oggetto passa al meridiano: è il punto più alto che raggiunge nel cielo.</dd>
+<dt>Data giuliana</dt><dd>Il conteggio continuo dei giorni introdotto da Giuseppe Scaligero nel 1583. Evita le complicazioni del calendario ed è la base di tutte le formule.</dd>
+<dt>Delta-T</dt><dd>La rotazione della Terra rallenta in modo irregolare. Delta-T è la differenza fra il tempo uniforme delle effemeridi e il tempo universale.</dd>
+<dt>Levata, transito, tramonto</dt><dd>Gli orari reali del Sole per il luogo: il transito è il vero mezzogiorno locale, che dipende dalla longitudine.</dd></dl>
+<h3>Schermata Luna</h3><dl>
+<dt>Fase</dt><dd>Le otto fasi: nuova, crescente, primo quarto, gibbosa crescente, piena, gibbosa calante, ultimo quarto, calante.</dd>
+<dt>Ascensione retta e declinazione</dt><dd>La posizione sulla sfera celeste. L'ascensione retta si misura verso est dal punto vernale; la declinazione è positiva a nord dell'equatore celeste.</dd>
+<dt>Lunazione</dt><dd>Il numero progressivo di ogni lunazione a partire dalla prima Luna nuova del 1923 (17 gennaio 1923).</dd>
+<dt>Angolo orario</dt><dd>La differenza fra tempo siderale locale e ascensione retta: dice quanto tempo è passato dal transito al meridiano.</dd>
+<dt>Altezza e azimut</dt><dd>L'altezza è l'angolo sopra l'orizzonte; l'azimut è la direzione misurata da nord verso est.</dd>
+<dt>Età, fase e faccia visibile</dt><dd>L'età è il tempo trascorso dall'ultima Luna nuova (mese sinodico medio: 29 g 12 h 44 min). «Fase» è la stessa età in percentuale del mese; «faccia visibile» è la parte del disco illuminata.</dd>
+<dt>Distanza</dt><dd>Da centro della Terra a centro della Luna; in media 384.400 km.</dd>
+<dt>Prossime fasi</dt><dd>Data e ora locale delle quattro fasi principali che seguono.</dd></dl>
+<h3>Schermata Sole</h3><dl>
+<dt>Durata del giorno</dt><dd>Il tempo fra levata e tramonto.</dd>
+<dt>Alba civile e crepuscolo</dt><dd>Quando il Sole è 6° sotto l'orizzonte: c'è luce sufficiente per stare all'aperto senza illuminazione.</dd>
+<dt>Altezza massima</dt><dd>L'ora del transito e l'altezza raggiunta dal Sole in quel momento.</dd>
+<dt>Distanza</dt><dd>Minima a inizio gennaio (perielio, circa 147 milioni di km), massima a inizio luglio (afelio, circa 152 milioni di km).</dd>
+<dt>Diametro angolare</dt><dd>Quanto appare grande il disco solare visto dalla Terra.</dd>
+<dt>Longitudine eclittica</dt><dd>La posizione del Sole lungo l'eclittica, da 0° a 360° partendo dal punto vernale.</dd>
+<dt>Equazione del tempo</dt><dd>La differenza fra l'ora di una meridiana e quella dell'orologio. Va da circa +16 min 33 s (inizio novembre) a −14 min 6 s (metà febbraio).</dd>
+<dt>Obliquità</dt><dd>L'inclinazione dell'asse terrestre rispetto al piano dell'orbita.</dd>
+<dt>Nutazione</dt><dd>Una piccola oscillazione dell'asse terrestre causata da Sole e Luna, con periodo principale di 18,6 anni: fino a 17″ in longitudine (Δψ) e 9″ in obliquità (Δε).</dd></dl>` },
+  en: { lat:"Latitude:", lon:"Longitude:", alt:"Elevation:", date:"Date:", time:"Time:", tz:"Time zone:", sid:"Sidereal time:", gsid:"Greenwich ST:",
+    jd:"Julian date:", dateUtc:"Date (UTC):", timeUtc:"Time (UTC):", rise:"Sunrise", transit:"Transit", set:"Sunset",
+    ra:"R.A.:", dec:"Declination:", lunation:"Lunation:", mrise:"Moonrise:", mset:"Moonset:", hour:"Hour angle:",
+    altaz:"Horizontal:", altitude:"Altitude:", azimuth:"Azimuth:", age:"Moon age:", phase:"Phase:", visible:"Illuminated:",
+    dist:"Distance:", ecl:"Ecliptic:", elat:"Latitude:", elon:"Longitude:", sun:"Sun", daylen:"Day length:",
+    dawn:"Civil dawn:", srise:"Sunrise:", maxalt:"Max altitude:", sset:"Sunset:", dusk:"Civil dusk:",
+    diam:"Angular diameter:", slon:"Ecliptic longitude:", eot:"Equation of time:", obl:"Obliquity:", nut:"Nutation:",
+    done:"Done", tabSettings:"Settings", tabLocation:"Location", tabLanguage:"Language", tabAbout:"About",
+    meters:"metres", feet:"feet", deg:"deg", days:"days", hours:"h", min:"min", sec:"sec",
+    none:"—", noRise:"no rise today", noSet:"no set today", polarDay:"above the horizon all day", polarNight:"below the horizon all day",
+    phases:["New Moon","Waxing Crescent","First Quarter","Waxing Gibbous","Full Moon","Waning Gibbous","Last Quarter","Waning Crescent"],
+    sSettings:"Settings", hemi:"Hemisphere", north:"north", south:"south", units:"Units", clock:"Clock", metric:"Metric", imperial:"Imperial",
+    sDateTime:"Date & time", realtime:"Realtime", yes:"yes", no:"no", fDate:"Date", fTime:"Time",
+    sMode:"Mode", gps:"GPS", useGps:"Use my location", sCoords:"Coordinates", country:"Country", city:"City", custom:"Custom",
+    fLat:"Latitude (°)", fLon:"Longitude (°)", fAlt:"Elevation", fTz:"Offset (hours from GMT)", fDst:"Daylight saving", auto:"automatic",
+    gpsWait:"Requesting location…", gpsFail:"Location isn't available here. Pick a city or type the coordinates.",
+    gpsPlace:"GPS location", latHint:"Decimal degrees: north positive, east positive (e.g. Bologna 44.4949 / 11.3426).",
+    sLang:"Language", realtimeHint:"With Realtime set to “no”, every calculation uses the date and time chosen below.",
+    aboutText:"Effemeridi computes, for the chosen place and moment, the quantities an amateur astronomer uses every night: sidereal time, Julian date, Moon position and phases, the Sun's path.",
+    aboutText2:"Rebuilt as a tribute to an iPhone app used for years (iEphemeris Pro by Marco Piccone, 2008–2018). Calculations follow Jean Meeus, “Astronomical Algorithms”.",
+    precision:"Accuracy: about 1 minute for rise and set times, a few arcseconds for positions.",
+    help: null }
+};
+const L = () => T[S.lang];
+const tr = k => (L()[k] ?? T.it[k]);
+
+/* =====================================================================
+   FORMATTAZIONE
+   ===================================================================== */
+const pad = (n, w = 2) => String(n).padStart(w, "0");
+const loc = () => (S.lang === "it" ? "it-IT" : "en-GB");
+const num = (x, d) => x.toLocaleString(loc(), { minimumFractionDigits: d, maximumFractionDigits: d });
+function hms(hours, dec = 0) {
+  hours = ((hours % 24) + 24) % 24; let tot = Math.round(hours * 3600 * 10 ** dec) / 10 ** dec;
+  const h = Math.floor(tot / 3600); tot -= h * 3600; const m = Math.floor(tot / 60); const s = tot - m * 60;
+  return { h, m, s: dec ? s.toFixed(dec).padStart(3 + dec, "0") : pad(Math.round(s)) };
+}
+const fmtSid = deg => { const t = hms(deg / 15, 4); return `${pad(t.h)}:${pad(t.m)}:${t.s}`; };
+const fmtRA = deg => { const t = hms(deg / 15); return `${pad(t.h)}h ${pad(t.m)}m ${t.s}s`; };
+function fmtDMS(deg, signed = true) {
+  const sg = deg < 0 ? "-" : (signed ? "+" : ""); let a = Math.abs(deg);
+  let d = Math.floor(a), m = Math.floor((a - d) * 60), s = Math.round(((a - d) * 60 - m) * 60);
+  if (s === 60) { s = 0; m++; } if (m === 60) { m = 0; d++; }
+  return `${sg}${pad(d)}° ${pad(m)}' ${pad(s)}"`;
+}
+function fmtLatLon(deg, isLat) {
+  const h = isLat ? (deg >= 0 ? "N" : "S") : (deg >= 0 ? "E" : (S.lang === "it" ? "O" : "W"));
+  return fmtDMS(Math.abs(deg), false).replace(/^0(?=\d\d°)/, "") + " " + h;
+}
+const localParts = (utMs, off) => new Date(utMs + off * 3600000);
+function fmtDate(utMs, off) {
+  return localParts(utMs, off).toLocaleDateString(loc(), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).replace(/\./g, "");
+}
+function fmtTime(utMs, off, secs = false, force24 = false) {
+  const d = localParts(utMs, off), H = d.getUTCHours(), tail = `:${pad(d.getUTCMinutes())}` + (secs ? `:${pad(d.getUTCSeconds())}` : "");
+  if (S.clock === "24" || force24) return pad(H) + tail;
+  return `${H % 12 || 12}${tail} ${H < 12 ? "AM" : "PM"}`;
+}
+const fmtOff = o => `GMT ${o < 0 ? "−" : "+"} ${num(Math.abs(o), 1)}`;
+const km = v => S.units === "metric" ? `${num(v, 3)} km` : `${num(v * 0.621371, 3)} mi`;
+
+/* =====================================================================
+   GRAFICA: Luna e Sole disegnati su canvas
+   ===================================================================== */
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function noiseField(size, seed, octaves) {
+  const out = new Float32Array(size * size), r = rng(seed);
+  let amp = 1, total = 0;
+  for (let o = 0; o < octaves; o++) {
+    const g = 4 << o, grid = new Float32Array((g + 1) * (g + 1)).map(() => r());
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const fx = x / size * g, fy = y / size * g, ix = fx | 0, iy = fy | 0, tx = fx - ix, ty = fy - iy;
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty), w = g + 1;
+      const a = grid[iy * w + ix], b = grid[iy * w + ix + 1], c = grid[(iy + 1) * w + ix], d = grid[(iy + 1) * w + ix + 1];
+      out[y * size + x] += amp * (a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy);
+    }
+    total += amp; amp *= 0.5;
+  }
+  for (let i = 0; i < out.length; i++) out[i] /= total;
+  return out;
+}
+const smooth = (a, b, x) => { x = Math.min(1, Math.max(0, (x - a) / (b - a))); return x * x * (3 - 2 * x); };
+function stretch(a) { let lo = Infinity, hi = -Infinity; for (const x of a) { if (x < lo) lo = x; if (x > hi) hi = x; } for (let i = 0; i < a.length; i++) a[i] = (a[i] - lo) / (hi - lo); return a; }
+const MOON_TEX = (() => {
+  const N = 360, tex = new Float32Array(N * N), r = rng(42);
+  const n1 = stretch(noiseField(N, 7, 5)), n2 = stretch(noiseField(N, 13, 5)), fine = stretch(noiseField(N, 23, 7));
+  // mari (x verso est = destra vista da nord, y verso sud = basso)
+  const maria = [[-0.28,-0.45,0.25,0.20],[0.17,-0.42,0.14,0.13],[0.35,-0.12,0.18,0.15],[0.68,-0.30,0.10,0.09],[0.55,0.12,0.11,0.17],
+    [0.35,0.32,0.08,0.08],[-0.15,0.38,0.16,0.12],[-0.62,-0.05,0.24,0.38],[-0.45,0.15,0.18,0.20],[-0.48,0.40,0.08,0.08],
+    [-0.05,-0.72,0.38,0.06],[0.03,-0.20,0.07,0.05],[-0.30,-0.05,0.13,0.10],[-0.25,0.20,0.10,0.08]];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const u = x / N * 2 - 1, v = y / N * 2 - 1, i = y * N + x; if (u * u + v * v > 1) continue;
+    const wu = u + (n1[i] - 0.5) * 0.22, wv = v + (n2[i] - 0.5) * 0.22;
+    let m = 0;
+    for (const [cx, cy, rx, ry] of maria) { const d = ((wu - cx) / (rx * 1.3)) ** 2 + ((wv - cy) / (ry * 1.3)) ** 2; m += Math.exp(-d * 1.2); }
+    const mare = smooth(0.25, 1.0, Math.min(1.2, m) + (fine[i] - 0.5) * 0.25);
+    tex[i] = 0.80 - 0.27 * mare + (n1[i] - 0.5) * 0.18 + (fine[i] - 0.5) * 0.24 * (1 - mare * 0.5);
+  }
+  // sfocatura leggera: toglie i bordi netti dei mari
+  for (let pass = 0; pass < 2; pass++) {
+    const src = tex.slice();
+    for (let y = 2; y < N - 2; y++) for (let x = 2; x < N - 2; x++) {
+      let acc = 0; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) acc += src[(y + dy) * N + x + dx];
+      if (tex[y * N + x] !== 0) tex[y * N + x] = acc / 25;
+    }
+  }
+  for (let c = 0; c < 320; c++) { // crateri discreti
+    const cr = (r() ** 4) * 0.035 + 0.004, a = r() * Math.PI * 2, rad = Math.sqrt(r()) * 0.95, cx = Math.cos(a) * rad, cy = Math.sin(a) * rad;
+    const x0 = Math.floor((cx - cr * 1.3 + 1) / 2 * N), x1 = Math.ceil((cx + cr * 1.3 + 1) / 2 * N), y0 = Math.floor((cy - cr * 1.3 + 1) / 2 * N), y1 = Math.ceil((cy + cr * 1.3 + 1) / 2 * N);
+    for (let y = Math.max(0, y0); y < Math.min(N, y1); y++) for (let x = Math.max(0, x0); x < Math.min(N, x1); x++) {
+      const u = x / N * 2 - 1, v = y / N * 2 - 1, dx = (u - cx) / cr, d = Math.hypot(dx, (v - cy) / cr);
+      if (d < 0.9) tex[y * N + x] -= 0.03 * (1 - d) * (0.6 - dx * 0.4);
+      else if (d < 1.2) tex[y * N + x] += 0.035 * (1 - Math.abs(d - 1.03) / 0.17);
+    }
+  }
+  // Tycho e Copernico: punti chiari con raggiere tenui
+  for (const [tx, ty, k] of [[-0.13, 0.66, 0.07], [-0.33, -0.25, 0.045]]) {
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const u = x / N * 2 - 1, v = y / N * 2 - 1; if (u * u + v * v > 1) continue;
+      const d = Math.hypot(u - tx, v - ty), ang = Math.atan2(v - ty, u - tx), i = y * N + x;
+      const ray = Math.max(0, Math.cos(ang * 7 + 1.3 + (n1[i] - 0.5) * 3)) ** 5 * Math.exp(-d * 2.6) * k;
+      tex[i] += ray + Math.exp(-((d / 0.022) ** 2)) * k * 1.6;
+    }
+  }
+  return { N, tex };
+})();
+function drawMoon(cv, illum, waxing, south) {
+  const W = cv.width, ctx = cv.getContext("2d"), img = ctx.createImageData(W, W), { N, tex } = MOON_TEX;
+  const cosT = 1 - 2 * illum; // posizione del terminatore
+  for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+    const u = (x + 0.5) / W * 2 - 1, v = (y + 0.5) / W * 2 - 1, rr = u * u + v * v;
+    const i4 = (y * W + x) * 4; if (rr > 1) continue;
+    const su = south ? -u : u, sv = south ? -v : v;
+    const t = tex[Math.min(N - 1, ((sv + 1) / 2 * N) | 0) * N + Math.min(N - 1, ((su + 1) / 2 * N) | 0)];
+    // a nord la crescente è illuminata a destra; a sud tutto il disco appare ruotato di 180°
+    const w = Math.sqrt(1 - sv * sv), xt = w * cosT, uu = waxing ? su : -su;
+    const k = smooth(-0.05, 0.05, uu - xt);
+    const limb = 0.68 + 0.32 * Math.sqrt(1 - rr);
+    const tt = Math.min(1, Math.max(0, t)), b = tt * limb * k * 255, es = tt * (0.10 + 0.05 * Math.sqrt(1 - rr)) * (1 - k) * 255; // luce cinerea, leggermente azzurra
+    const edge = Math.min(1, (1 - Math.sqrt(rr)) * W * 0.5);
+    img.data[i4] = b + es * 0.92; img.data[i4 + 1] = b * 0.985 + es * 0.97; img.data[i4 + 2] = b * 0.95 + es * 1.08; img.data[i4 + 3] = 255 * edge;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+const SUN_NOISE = noiseField(200, 99, 6), SUN_NOISE2 = noiseField(200, 5, 5), SUN_FINE = noiseField(200, 31, 6);
+const mix = (a, b, t) => a + (b - a) * t;
+function drawSun(cv, mode) {
+  const W = cv.width, ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, W, W);
+  if (mode === "big") { // Sole in H-alfa: maculato, con cromosfera e una protuberanza a fiamma
+    const R = 0.78, cx0 = -0.08, cy0 = -0.04, grain = rng(5), c = W / 2, rad = R * W / 2, ox = c + cx0 * c, oy = c + cy0 * c;
+    const disc = document.createElement("canvas"); disc.width = disc.height = W;
+    const dctx = disc.getContext("2d"), img = dctx.createImageData(W, W);
+    for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+      const u = (x + 0.5) / W * 2 - 1, v = (y + 0.5) / W * 2 - 1, i4 = (y * W + x) * 4;
+      const d = Math.hypot(u - cx0, v - cy0) / R; if (d > 1) continue;
+      const ix = Math.min(199, ((u + 1) / 2 * 200) | 0), iy = Math.min(199, ((v + 1) / 2 * 200) | 0);
+      const g = SUN_NOISE[iy * 200 + ix] * 0.45 + SUN_NOISE2[iy * 200 + ix] * 0.25 + SUN_FINE[iy * 200 + ix] * 0.30;
+      const gs = g + (grain() - 0.5) * 0.22, t = smooth(0.26, 0.50, gs), hi = smooth(0.50, 0.66, gs);
+      const limb = 0.72 + 0.28 * Math.sqrt(1 - d * d);
+      const rr = mix(mix(165, 240, t), 255, hi), gg = mix(mix(40, 150, t), 236, hi), bb = mix(mix(14, 40, t), 120, hi);
+      img.data[i4] = rr * limb; img.data[i4 + 1] = gg * limb; img.data[i4 + 2] = bb * limb;
+      img.data[i4 + 3] = 255 * Math.min(1, (1 - d) * W * 0.4);
+    }
+    dctx.putImageData(img, 0, 0);
+    const pr = rng(77);
+    ctx.save(); ctx.translate(ox, oy); ctx.lineCap = "round";
+    ctx.shadowColor = "rgba(255,80,20,.75)"; ctx.shadowBlur = W * 0.025;
+    ctx.strokeStyle = "rgba(225,65,20,.6)"; ctx.lineWidth = W * 0.012;   // cromosfera
+    ctx.beginPath(); ctx.arc(0, 0, rad * 1.004, 0, Math.PI * 2); ctx.stroke();
+    const ac = 0.18, span = 0.55;
+    for (let k = 0; k < 190; k++) {                                        // filamenti della protuberanza
+      const t = pr(), a = ac + (t - 0.5) * span, env = Math.pow(Math.sin(Math.PI * t), 0.8);
+      const h = rad * (0.03 + 0.26 * env * (0.5 + 0.65 * pr()));
+      const bend = (0.5 - t) * 0.34 + (pr() - 0.5) * 0.14;                 // le fibre si piegano verso il centro: forma ad arco
+      const r0 = rad * 0.97, r1 = rad + h, ca = a + bend * 0.45, ta = a + bend;
+      ctx.strokeStyle = `hsla(${10 + pr() * 24},95%,${46 + pr() * 20}%,${0.14 + pr() * 0.22})`;
+      ctx.lineWidth = W * (0.004 + pr() * 0.01);
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0);
+      ctx.quadraticCurveTo(Math.cos(ca) * (r0 + h * 0.75), Math.sin(ca) * (r0 + h * 0.75), Math.cos(ta) * r1, Math.sin(ta) * r1);
+      ctx.stroke();
+    }
+    for (let k = 0; k < 14; k++) {                                         // piccole spicole sparse sul bordo
+      const a = pr() * Math.PI * 2, h = rad * (0.02 + pr() * 0.05);
+      ctx.strokeStyle = "rgba(230,80,30,.35)"; ctx.lineWidth = W * 0.006;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * rad * 0.98, Math.sin(a) * rad * 0.98); ctx.lineTo(Math.cos(a + 0.03) * (rad + h), Math.sin(a + 0.03) * (rad + h)); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.drawImage(disc, 0, 0);
+    return;
+  }
+  if (mode === "transit") { // sfera gialla lucida con alone
+    const c = W / 2, halo = ctx.createRadialGradient(c, c, W * 0.26, c, c, W * 0.5);
+    halo.addColorStop(0, "rgba(255,190,60,.75)"); halo.addColorStop(0.35, "rgba(255,160,40,.28)"); halo.addColorStop(1, "rgba(255,140,30,0)");
+    ctx.fillStyle = halo; ctx.fillRect(0, 0, W, W);
+    const ball = ctx.createRadialGradient(c - W * 0.09, c - W * 0.11, W * 0.02, c, c, W * 0.33);
+    ball.addColorStop(0, "#fffbd6"); ball.addColorStop(0.35, "#ffe36a"); ball.addColorStop(0.8, "#f6bb22"); ball.addColorStop(1, "#e19a10");
+    ctx.fillStyle = ball; ctx.beginPath(); ctx.arc(c, c, W * 0.32, 0, Math.PI * 2); ctx.fill();
+    return;
+  }
+  if (mode === "set") { // notte: Luna piena tra le nuvole
+    const m = document.createElement("canvas"); m.width = m.height = Math.round(W * 0.6); drawMoon(m, 1, true, false);
+    ctx.drawImage(m, W * 0.21, W * 0.14);
+    const blobs = [[0.18, 0.60, 0.15, 0.07, 0.85], [0.33, 0.70, 0.20, 0.08, 0.8], [0.52, 0.76, 0.22, 0.06, 0.7], [0.72, 0.68, 0.21, 0.08, 0.75],
+      [0.88, 0.60, 0.11, 0.05, 0.6], [0.08, 0.52, 0.08, 0.035, 0.55], [0.62, 0.62, 0.12, 0.05, 0.5], [0.80, 0.45, 0.07, 0.03, 0.35]];
+    for (const [x, y, rx, ry, a] of blobs) {
+      ctx.save(); ctx.translate(x * W, y * W); ctx.scale(rx * W, ry * W);
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      g.addColorStop(0, `rgba(238,238,242,${a})`); g.addColorStop(0.55, `rgba(220,220,228,${a * 0.55})`); g.addColorStop(1, "rgba(210,210,220,0)");
+      ctx.fillStyle = g; ctx.fillRect(-1, -1, 2, 2); ctx.restore();
+    }
+    return;
+  }
+  // "rise": Sole che sorge dal mare, con i riflessi
+  const img = ctx.createImageData(W, W), rad = 0.62, cy = 0.04;
+  for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+    const u = (x + 0.5) / W * 2 - 1, v = (y + 0.5) / W * 2 - 1, i4 = (y * W + x) * 4;
+    const d = Math.hypot(u, v - cy) / rad;
+    const n = SUN_NOISE[(Math.min(199, ((v + 1) / 2 * 200) | 0)) * 200 + Math.min(199, ((u + 1) / 2 * 200) | 0)];
+    let r = 0, g = 0, b = 0, a = 0;
+    if (d <= 1.15) {
+      const limb = d <= 1 ? 0.75 + 0.25 * Math.sqrt(1 - d * d) : 0.75;
+      r = 250 * limb; g = (175 + 50 * n + (1 - v) * 18) * limb; b = (70 + 40 * n) * limb;
+      a = 255 * smooth(1.15, 0.85, d);
+    }
+    if (v > cy + 0.18) { // orizzonte: bande orizzontali
+      const band = Math.sin((v - cy) * 62) > -0.1 ? 1 : 0.25;
+      const half = rad * 1.22 - (v - cy - 0.18) * 0.25;
+      const fade = smooth(half, half - 0.12, Math.abs(u)) * smooth(0.95, 0.55, v);
+      r = 245; g = 205 + 20 * n; b = 90; a = 255 * band * fade;
+    }
+    img.data[i4] = r; img.data[i4 + 1] = g; img.data[i4 + 2] = b; img.data[i4 + 3] = a;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/* =====================================================================
+   CALCOLO E RENDER
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const set = (id, v) => { const el = $(id); if (el.textContent !== v) el.textContent = v; };
+let dayCache = { key: "" };
+
+function dayKey(utMs, off) { const d = localParts(utMs, off); return [d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), S.lat, S.lon, off, S.lang, S.hemi, S.units].join("|"); }
+
+function computeDay(utMs, off) {
+  const d = localParts(utMs, off), start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - off * 3600000;
+  const sunE = Astro.events("sun", start, S.lat, S.lon, () => -0.8333);
+  const civ = Astro.events("sun", start, S.lat, S.lon, () => -6);
+  const moonE = Astro.events("moon", start, S.lat, S.lon, p => 0.7275 * p.par - 0.5667);
+  return { sunE, civ, moonE, start };
+}
+
+function render() {
+  const ut = currentUT(), off = offsetAt(ut), jd = Astro.jdFromMs(ut);
+  const key = dayKey(ut, off);
+  if (dayCache.key !== key) { dayCache = { key, ...computeDay(ut, off) }; renderDaily(off); }
+
+  // --- Tempo
+  const d = localParts(ut, off);
+  set("calMonth", d.toLocaleDateString(loc(), { month: "short", year: "numeric", timeZone: "UTC" }).replace(/\./g, ""));
+  set("calDay", String(d.getUTCDate()));
+  set("vDate", fmtDate(ut, off)); set("vTime", fmtTime(ut, off, true));
+  set("vTz", fmtOff(off));
+  const sn = Astro.sun(jd);
+  set("vSid", fmtSid(Astro.gast(jd, sn.nut) + S.lon));
+  set("vGsid", fmtSid(Astro.gast(jd, sn.nut)));
+  set("vJd", jd.toFixed(6).replace(".", S.lang === "it" ? "," : "."));
+  set("vDateU", fmtDate(ut, 0)); set("vTimeU", fmtTime(ut, 0, true));
+  set("vDT", `${num(sn.dT, 2)} ${tr("sec")}`);
+
+  // --- Sole
+  set("sRa", fmtRA(sn.ra)); set("sDec", fmtDMS(sn.dec));
+  set("sDist", km(sn.km)); set("sDiam", `${num(sn.diam, 2)} ${tr("deg")}`); set("sLon", `${num(sn.lam, 2)} ${tr("deg")}`);
+  const e = sn.eot, em = Math.floor(Math.abs(e)), es = Math.round((Math.abs(e) - em) * 60);
+  set("sEot", `${e < 0 ? "−" : "+"} ${em} ${tr("min")} ${pad(es === 60 ? 0 : es)} ${tr("sec")}`);
+  set("sObl", `${num(sn.nut.eps, 4)} ${tr("deg")}`);
+  set("sDpsi", `${num(sn.nut.dpsi, 2)}″`); set("sDeps", `${num(sn.nut.deps, 2)}″`);
+
+  // --- Luna
+  // posizione e distanza geocentriche (come negli annuari); altezza e azimut visti dal luogo
+  const mg = Astro.moon(jd), mn = mg, hz = Astro.horizontal(Astro.topocentric(mg, jd, S.lat, S.lon, S.alt), jd, S.lat, S.lon);
+  const topoAlt = hz.alt;
+  set("mRa", fmtRA(mn.ra)); set("mDec", fmtDMS(mn.dec));
+  const ha = hms(hz.H / 15); set("mHA", `${pad(ha.h)}h ${pad(ha.m)}m`);
+  set("mAlt", `${num(topoAlt, 2)} ${tr("deg")}`); set("mAz", `${num(hz.az, 2)} ${tr("deg")}`);
+  set("mDist", km(mn.km)); set("mEb", fmtDMS(mn.beta)); set("mEl", fmtDMS(mn.lam, false));
+
+  const ph = Astro.phases(jd), age = jd - ph.lastNew.jd, frac = age / Astro.SYN;
+  const ad = Math.floor(age), ah = Math.floor((age - ad) * 24), am = Math.floor(((age - ad) * 24 - ah) * 60);
+  set("mAge", `${ad} ${tr("days")} ${ah} ${tr("hours")} ${am} ${tr("min")}`);
+  set("mPhase", `${num(frac * 100, 2)} %`);
+  const elong = Astro.n360(mg.lam - sn.lam), cosE = Math.cos(mg.beta * Astro.D2R) * Math.cos(elong * Astro.D2R);
+  const psi = Math.acos(cosE), i = Math.atan2(sn.km * Math.sin(psi), mg.km - sn.km * cosE), illum = (1 + Math.cos(i)) / 2;
+  set("mVis", `${num(illum * 100, 2)} %`);
+  set("mLun", String(ph.lunation));
+  const idx = frac < 0.0339 || frac >= 0.9661 ? 0 : frac < 0.216 ? 1 : frac < 0.284 ? 2 : frac < 0.466 ? 3 : frac < 0.534 ? 4 : frac < 0.716 ? 5 : frac < 0.784 ? 6 : 7;
+  if ($("moonName").textContent !== tr("phases")[idx]) { set("moonName", tr("phases")[idx]); fitTitle($("moonName")); }
+  const mk = `${num(illum, 3)}|${elong < 180}|${S.hemi}`;
+  if (render.moonKey !== mk) { render.moonKey = mk; drawMoon($("moonBig"), illum, elong < 180, S.hemi === "S"); }
+
+  // fasi successive
+  const pk = ph.next.map(p => p.jd.toFixed(4)).join() + off + S.lang + S.hemi;
+  if (render.phaseKey !== pk) {
+    render.phaseKey = pk;
+    const strip = $("phaseStrip"); strip.textContent = "";
+    ph.next.forEach(p => {
+      const ms = Astro.msFromJd(p.jd), cell = document.createElement("div"), cv = document.createElement("canvas");
+      cv.width = cv.height = 140; cell.append(cv);
+      const dd = document.createElement("span"); dd.textContent = localParts(ms, offsetAt(ms)).toLocaleDateString(loc(), { day: "numeric", month: "short", timeZone: "UTC" }).replace(/\./g, "");
+      const tt = document.createElement("span"); tt.textContent = fmtTime(ms, offsetAt(ms));
+      cell.title = tr("phases")[p.type * 2]; cell.append(dd, tt); strip.append(cell);
+      drawMoon(cv, [0, 0.5, 1, 0.5][p.type], p.type < 2, S.hemi === "S");
+    });
+  }
+  for (const id of ["placeName", "moonName"]) { const el = $(id); if (el.scrollWidth > el.clientWidth + 1) fitTitle(el); }
+  $("signal").classList.toggle("off", !S.realtime);
+  $("signal").title = S.realtime ? tr("realtime") + ": " + tr("yes") : tr("realtime") + ": " + tr("no");
+}
+
+function fitTitle(el) {
+  el.style.fontSize = "";
+  let fs = parseFloat(getComputedStyle(el).fontSize);
+  while (el.scrollWidth > el.clientWidth + 1 && fs > 20) { fs -= 1; el.style.fontSize = fs + "px"; }
+}
+function renderDaily(off) {
+  const { sunE, civ, moonE } = dayCache;
+  set("placeName", S.place); fitTitle($("placeName"));
+  set("vLat", fmtLatLon(S.lat, true)); set("vLon", fmtLatLon(S.lon, false));
+  set("vAlt", S.units === "metric" ? `${num(S.alt, 2)} ${tr("meters")}` : `${num(S.alt * 3.28084, 2)} ${tr("feet")}`);
+  const tm = ev => ev ? fmtTime(ev.ms, off) : tr("none");
+  set("vRise", tm(sunE.rise)); set("vTransit", tm(sunE.transit)); set("vSet", tm(sunE.set));
+  set("sRise", tm(sunE.rise)); set("sSet", tm(sunE.set)); set("sDawn", tm(civ.rise)); set("sDusk", tm(civ.set));
+  set("sMax", sunE.transit ? `${fmtTime(sunE.transit.ms, off)}  (${num(sunE.transit.alt, 2)}°)` : tr("none"));
+  if (sunE.rise && sunE.set) {
+    let len = (sunE.set.ms - sunE.rise.ms) / 60000; if (len < 0) len += 1440;
+    set("sLen", `${Math.floor(len / 60)} ${tr("hours")} ${Math.round(len % 60)} ${tr("min")}`);
+  } else {
+    const above = sunE.transit && sunE.transit.alt > 0;
+    set("sLen", above ? "24 " + tr("hours") : "0 " + tr("hours"));
+  }
+  const mt = (ev, miss) => ev ? `${fmtTime(ev.ms, off, false, true)} ${tr("azimuth")} ${num(ev.az, 2)}°` : tr(miss);
+  set("mRise", mt(moonE.rise, "noRise")); set("mSet", mt(moonE.set, "noSet"));
+  // ordina levata/tramonto per ora, come nell'originale
+  const rows = $("p-moon").querySelector(".rows"), rdt = rows.children[0], rdd = rows.children[1], sdt = rows.children[2], sdd = rows.children[3];
+  const setFirst = moonE.set && (!moonE.rise || moonE.set.ms < moonE.rise.ms);
+  if (setFirst && rdt.dataset.t === "mrise") { rows.insertBefore(sdt, rdt); rows.insertBefore(sdd, rdt); }
+  if (!setFirst && rdt.dataset.t === "mset") { rows.insertBefore(sdt, rdt); rows.insertBefore(sdd, rdt); }
+}
+
+function applyTexts() {
+  document.documentElement.lang = S.lang;
+  document.querySelectorAll("[data-t]").forEach(el => { el.textContent = tr(el.dataset.t); });
+  $("helpBody").innerHTML = T[S.lang].help || T.it.help;
+  if (S.lang === "en") $("helpBody").innerHTML = `<p>Explanations are written in Italian; switch the language in Settings › Language.</p>` + T.it.help;
+}
+
+/* =====================================================================
+   NAVIGAZIONE
+   ===================================================================== */
+const pager = $("pager"), dots = [...$("dots").children];
+pager.addEventListener("scroll", () => {
+  const i = Math.round(pager.scrollLeft / pager.clientWidth);
+  dots.forEach((b, j) => b.setAttribute("aria-current", String(i === j)));
+  try { localStorage.setItem("effemeridi.page", String(i)); } catch (e) {}
+}, { passive: true });
+dots.forEach((b, j) => b.addEventListener("click", () => pager.scrollTo({ left: j * pager.clientWidth, behavior: "smooth" })));
+document.addEventListener("keydown", e => {
+  if (!$("sheet").hidden || !$("help").hidden) { if (e.key === "Escape") { closeSheet(); $("help").hidden = true; } return; }
+  const i = Math.round(pager.scrollLeft / pager.clientWidth);
+  if (e.key === "ArrowRight") pager.scrollTo({ left: Math.min(2, i + 1) * pager.clientWidth, behavior: "smooth" });
+  if (e.key === "ArrowLeft") pager.scrollTo({ left: Math.max(0, i - 1) * pager.clientWidth, behavior: "smooth" });
+});
+$("btnHelp").onclick = () => { $("help").hidden = false; };
+$("helpDone").onclick = () => { $("help").hidden = true; };
+
+/* =====================================================================
+   IMPOSTAZIONI
+   ===================================================================== */
+let tab = "settings", gpsMsg = "";
+$("btnGear").onclick = () => { $("sheet").hidden = false; renderSheet(); };
+$("sheetDone").onclick = closeSheet;
+function closeSheet() { $("sheet").hidden = true; save(); dayCache.key = ""; render.moonKey = render.phaseKey = ""; render(); }
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.tab; renderSheet(); });
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const opt = (v, label, cur) => `<option value="${esc(v)}"${String(v) === String(cur) ? " selected" : ""}>${esc(label)}</option>`;
+const chev = `<span class="chev" aria-hidden="true">›</span>`;
+
+function renderSheet() {
+  document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
+  const titles = { settings: "tabSettings", location: "tabLocation", language: "tabLanguage", about: "tabAbout" };
+  $("sheetTitle").textContent = tr(titles[tab]);
+  const body = $("sheetBody"); let h = "";
+  if (tab === "settings") {
+    h = `<div class="sec">${tr("sSettings")}</div><div class="group">
+      <div class="cell"><label for="fHemi">${tr("hemi")}</label><span class="v"><select id="fHemi">${opt("N", tr("north"), S.hemi)}${opt("S", tr("south"), S.hemi)}</select>${chev}</span></div>
+      <div class="cell"><label for="fUnits">${tr("units")}</label><span class="v"><select id="fUnits">${opt("metric", tr("metric"), S.units)}${opt("imperial", tr("imperial"), S.units)}</select>${chev}</span></div>
+      <div class="cell"><label for="fClock">${tr("clock")}</label><span class="v"><select id="fClock">${opt("12", "12 h (AM/PM)", S.clock)}${opt("24", "24 h", S.clock)}</select>${chev}</span></div></div>
+      <div class="sec">${tr("sDateTime")}</div><div class="group">
+      <div class="cell"><label for="fRt">${tr("realtime")}</label><span class="v"><select id="fRt">${opt("1", tr("yes"), S.realtime ? 1 : 0)}${opt("0", tr("no"), S.realtime ? 1 : 0)}</select>${chev}</span></div>
+      <div class="cell"><label for="fDate">${tr("fDate")}</label><span class="v"><input type="date" id="fDate" value="${S.date}" ${S.realtime ? "disabled" : ""}></span></div>
+      <div class="cell"><label for="fTime">${tr("fTime")}</label><span class="v"><input type="time" step="1" id="fTime" value="${S.time}" ${S.realtime ? "disabled" : ""}></span></div></div>
+      <p class="note">${tr("realtimeHint")}</p>`;
+  } else if (tab === "location") {
+    const inCountry = CITIES.filter(c => c[1] === S.country);
+    const isCity = inCountry.some(c => c[0] === S.place);
+    const tzOpts = []; for (let o = -12; o <= 14; o += 0.5) tzOpts.push(opt(o, fmtOff(o), S.rule === "SYS" ? "" : S.tz));
+    h = `<div class="sec">${tr("sMode")}</div><div class="group">
+      <div class="cell"><button class="btn" id="fGps">${tr("useGps")}</button><span class="v">${S.gps ? tr("yes") : tr("no")}</span></div></div>
+      ${gpsMsg ? `<p class="note" role="status">${esc(gpsMsg)}</p>` : ""}
+      <div class="sec">${tr("sCoords")}</div><div class="group">
+      <div class="cell"><label for="fCountry">${tr("country")}</label><span class="v"><select id="fCountry">${COUNTRIES.map(c => opt(c, c, S.country)).join("")}${S.gps ? opt("", "—", "") : ""}</select>${chev}</span></div>
+      <div class="cell"><label for="fCity">${tr("city")}</label><span class="v"><select id="fCity">${isCity ? "" : opt("", S.place, "")}${inCountry.map(c => opt(c[0], c[0], S.place)).join("")}</select>${chev}</span></div>
+      <div class="cell"><label for="fLat">${tr("fLat")}</label><span class="v"><input type="number" inputmode="decimal" step="0.0001" min="-90" max="90" id="fLat" value="${S.lat}"></span></div>
+      <div class="cell"><label for="fLon">${tr("fLon")}</label><span class="v"><input type="number" inputmode="decimal" step="0.0001" min="-180" max="180" id="fLon" value="${S.lon}"></span></div>
+      <div class="cell"><label for="fAltm">${tr("fAlt")} (${S.units === "metric" ? tr("meters") : tr("feet")})</label><span class="v"><input type="number" inputmode="decimal" id="fAltm" value="${S.units === "metric" ? S.alt : Math.round(S.alt * 3.28084)}"></span></div>
+      <div class="cell"><label for="fTz">${tr("fTz")}</label><span class="v"><select id="fTz">${S.rule === "SYS" ? opt("", tr("auto"), "") : ""}${tzOpts.join("")}</select>${chev}</span></div>
+      <div class="cell"><label for="fDst">${tr("fDst")}</label><span class="v"><select id="fDst">${opt("auto", tr("auto"), S.dst)}${opt("on", tr("yes"), S.dst)}${opt("off", tr("no"), S.dst)}</select>${chev}</span></div></div>
+      <p class="note">${tr("latHint")}</p>`;
+  } else if (tab === "language") {
+    h = `<div class="sec">${tr("sLang")}</div><div class="group">
+      ${[["it", "Italiano"], ["en", "English"]].map(([k, n]) => `<div class="cell"><button class="btn" data-lang="${k}" style="color:var(--sheet-ink)">${n}</button>${S.lang === k ? '<span class="check">✓</span>' : ""}</div>`).join("")}</div>`;
+  } else {
+    h = `<div class="about"><canvas id="aboutMoon" width="340" height="340"></canvas>
+      <p>${tr("aboutText")}</p><p>${tr("aboutText2")}</p><p class="ver">${tr("precision")}</p><p class="ver">Effemeridi 1.0 · 2026</p></div>`;
+  }
+  body.innerHTML = h;
+  if (tab === "about") drawMoon($("aboutMoon"), 0.98, true, S.hemi === "S");
+  bindSheet();
+}
+
+function bindSheet() {
+  const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
+  on("fHemi", "change", e => { S.hemi = e.target.value; save(); });
+  on("fUnits", "change", e => { S.units = e.target.value; save(); renderSheet(); });
+  on("fClock", "change", e => { S.clock = e.target.value; save(); });
+  on("fRt", "change", e => { S.realtime = e.target.value === "1"; save(); renderSheet(); });
+  on("fDate", "change", e => { if (e.target.value) S.date = e.target.value; save(); });
+  on("fTime", "change", e => { if (e.target.value) S.time = e.target.value.length === 5 ? e.target.value + ":00" : e.target.value; save(); });
+  on("fCountry", "change", e => { S.country = e.target.value; const c = CITIES.find(c => c[1] === S.country); if (c) pickCity(c); renderSheet(); });
+  on("fCity", "change", e => { const c = CITIES.find(c => c[0] === e.target.value && c[1] === S.country); if (c) pickCity(c); renderSheet(); });
+  const custom = () => { if (!S.gps) S.place = tr("custom"); };
+  on("fLat", "change", e => { const v = parseFloat(e.target.value); if (isFinite(v) && Math.abs(v) <= 90) { S.lat = v; custom(); save(); renderSheet(); } });
+  on("fLon", "change", e => { const v = parseFloat(e.target.value); if (isFinite(v) && Math.abs(v) <= 180) { S.lon = v; custom(); save(); renderSheet(); } });
+  on("fAltm", "change", e => { const v = parseFloat(e.target.value); if (isFinite(v)) { S.alt = S.units === "metric" ? v : v / 3.28084; save(); } });
+  on("fTz", "change", e => { if (e.target.value === "") return; S.tz = parseFloat(e.target.value); if (S.rule === "SYS") S.rule = "EU"; save(); });
+  on("fDst", "change", e => { S.dst = e.target.value; save(); });
+  on("fGps", "click", useGps);
+  document.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => { S.lang = b.dataset.lang; save(); applyTexts(); renderSheet(); });
+}
+function pickCity(c) {
+  [S.place, S.country, S.lat, S.lon, S.alt, S.tz, S.rule] = c; S.gps = false; S.dst = "auto"; gpsMsg = ""; save();
+}
+function useGps() {
+  if (!navigator.geolocation) { gpsMsg = tr("gpsFail"); renderSheet(); return; }
+  gpsMsg = tr("gpsWait"); renderSheet();
+  navigator.geolocation.getCurrentPosition(p => {
+    S.gps = true; S.lat = +p.coords.latitude.toFixed(4); S.lon = +p.coords.longitude.toFixed(4);
+    S.alt = p.coords.altitude ? Math.round(p.coords.altitude) : 0; S.place = tr("gpsPlace"); S.country = "";
+    S.rule = "SYS"; S.dst = "auto"; gpsMsg = ""; save(); renderSheet();
+  }, () => { gpsMsg = tr("gpsFail"); renderSheet(); }, { timeout: 10000, maximumAge: 600000 });
+}
+
+/* =====================================================================
+   AVVIO
+   ===================================================================== */
+applyTexts();
+drawSun($("sunBig"), "big"); drawSun($("icRise"), "rise"); drawSun($("icTransit"), "transit"); drawSun($("icSet"), "set");
+render();
+try { const pg = +localStorage.getItem("effemeridi.page"); if (pg > 0) requestAnimationFrame(() => { pager.scrollLeft = pg * pager.clientWidth; }); } catch (e) {}
+addEventListener("resize", () => { fitTitle($("placeName")); fitTitle($("moonName")); });
+setInterval(() => { if (S.realtime || render.first !== true) { render(); render.first = true; } }, 1000);
+</script>
+</body>
+</html>
