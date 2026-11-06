@@ -1068,12 +1068,23 @@ function bindSheet() {
 function pickCity(c) {
   [S.place, S.country, S.lat, S.lon, S.alt, S.tz, S.rule] = c; S.gps = false; S.dst = "auto"; gpsMsg = ""; save();
 }
+// Nome del luogo GPS: la città più vicina dell'elenco, se entro 25 km (calcolo locale, nessun servizio esterno)
+function nameFromCoords() {
+  let best = null, bestKm = Infinity;
+  for (const c of CITIES) {
+    const p1 = S.lat * Math.PI / 180, p2 = c[2] * Math.PI / 180, dl = (c[3] - S.lon) * Math.PI / 180;
+    const km = 6371 * Math.acos(Math.min(1, Math.sin(p1) * Math.sin(p2) + Math.cos(p1) * Math.cos(p2) * Math.cos(dl)));
+    if (km < bestKm) { bestKm = km; best = c; }
+  }
+  if (best && bestKm <= 25) { S.place = best[0]; S.country = best[1]; }
+  else { S.place = tr("gpsPlace"); S.country = ""; }
+}
 function useGps() {
   if (!navigator.geolocation) { gpsMsg = tr("gpsFail"); renderSheet(); return; }
   gpsMsg = tr("gpsWait"); renderSheet();
   navigator.geolocation.getCurrentPosition(p => {
     S.gps = true; S.lat = +p.coords.latitude.toFixed(4); S.lon = +p.coords.longitude.toFixed(4);
-    S.alt = p.coords.altitude ? Math.round(p.coords.altitude) : 0; S.place = tr("gpsPlace"); S.country = "";
+    S.alt = p.coords.altitude ? Math.round(p.coords.altitude) : 0; nameFromCoords();
     S.rule = "SYS"; S.dst = "auto"; gpsMsg = ""; save(); renderSheet();
   }, () => { gpsMsg = tr("gpsFail"); renderSheet(); }, { timeout: 10000, maximumAge: 600000 });
 }
@@ -1081,6 +1092,7 @@ function useGps() {
 /* =====================================================================
    AVVIO
    ===================================================================== */
+if (S.gps && (S.place === T.it.gpsPlace || S.place === T.en.gpsPlace)) { nameFromCoords(); save(); }
 applyTexts();
 drawSun($("sunBig"), "big"); drawSun($("icRise"), "rise"); drawSun($("icTransit"), "transit"); drawSun($("icSet"), "set");
 render();
