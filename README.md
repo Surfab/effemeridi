@@ -20,6 +20,12 @@ Algoritmi di Jean Meeus, *Astronomical Algorithms* (2ª ed.): Sole (cap. 25), Lu
 
 Un solo file `index.html`, senza dipendenze esterne. Sole e Luna sono disegnati dal codice.
 
+## Nome del luogo con il GPS
+
+Con il GPS attivo l'app mostra il nome del comune italiano in cui ti trovi, scegliendo tra tutti i 7.904 comuni (tiene conto anche della popolazione, perché una città grande copre più territorio di un paese). Fuori dall'Italia usa un piccolo elenco di città del mondo. Il calcolo avviene sul telefono: la posizione non viene inviata a nessun servizio.
+
+Dati dei comuni: [geolocalizzazione-comuni-italiani](https://github.com/ggbaro/geolocalizzazione-comuni-italiani) di Christian Di Maio (licenza MIT). 61 coordinate risultate errate (comuni collocati all'estero o lontani dalla propria provincia) sono state corrette con dati © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL).
+
 ## Origine
 
 Ricostruita come omaggio a un'app per iPhone usata per anni, *iEphemeris Pro* di Marco Piccone (2008–2018), non più disponibile. Codice, grafica e testi sono nuovi.
